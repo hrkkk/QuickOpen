@@ -35,15 +35,15 @@ body {
 }
 
 body[data-card-size="small"] {
-  --card-size: 84px;
+  --card-size: 64px;
 }
 
 body[data-card-size="medium"] {
-  --card-size: 112px;
+  --card-size: 84px;
 }
 
 body[data-card-size="large"] {
-  --card-size: 140px;
+  --card-size: 112px;
 }
 
 body::before,
@@ -175,14 +175,6 @@ body[data-column-layout="vertical"] .columns {
   width: auto;
   min-width: clamp(34px, 2.9vw, 42px);
   padding: 0 7px;
-  background: rgba(114, 87, 217, 0.12);
-  color: #563bb8;
-  font-family: Consolas, monospace;
-}
-
-.column[data-section="command"] .card-thumb {
-  background: linear-gradient(135deg, rgba(114, 87, 217, 0.2), rgba(86, 59, 184, 0.1));
-  color: #563bb8;
   font-family: Consolas, monospace;
 }
 
@@ -252,8 +244,9 @@ body[data-column-layout="vertical"] .columns {
 }
 
 .card {
+  position: relative;
   width: 100%;
-  border: 1px solid rgba(111, 83, 58, 0.1);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   min-height: 0;
   height: var(--card-size, 88px);
@@ -265,7 +258,7 @@ body[data-column-layout="vertical"] .columns {
   gap: clamp(8px, 0.9vh, 10px);
   text-align: center;
   cursor: pointer;
-  background: linear-gradient(180deg, var(--card), rgba(255, 251, 244, 0.92));
+  background: transparent;
   color: inherit;
   transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
@@ -298,6 +291,7 @@ body[data-column-layout="vertical"] .columns {
 .card-thumb.has-image {
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   color: transparent;
 }
 
@@ -400,6 +394,47 @@ body[data-column-layout="vertical"] .columns {
   font-size: 1rem;
   font-weight: 700;
   color: #2c2f36;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  z-index: 2;
+  padding: 2px 3px;
+  border-radius: 6px;
+  color: rgba(78, 65, 55, 0.42);
+  font-size: 0.78rem;
+  line-height: 1;
+  letter-spacing: -0.16em;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.card:hover .drag-handle,
+.drag-handle:focus-visible {
+  opacity: 1;
+}
+
+.drag-handle:hover {
+  color: #563bb8;
+  background: rgba(114, 87, 217, 0.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.card.dragging {
+  opacity: 0.42;
+  transform: scale(0.96);
+}
+
+.card-list.drag-active {
+  border-radius: 12px;
+  outline: 2px dashed rgba(114, 87, 217, 0.22);
+  outline-offset: 5px;
 }
 
 .dialog-head p {
@@ -743,18 +778,18 @@ body[data-column-layout="vertical"] .columns {
 }
 
 .size-preview-small {
+  width: 18px;
+  height: 18px;
+}
+
+.size-preview-medium {
   width: 24px;
   height: 24px;
 }
 
-.size-preview-medium {
+.size-preview-large {
   width: 32px;
   height: 32px;
-}
-
-.size-preview-large {
-  width: 40px;
-  height: 40px;
 }
 
 .settings-actions {
@@ -903,4 +938,46 @@ body[data-column-layout="vertical"] .columns {
   .settings-options-layout {
     grid-template-columns: 1fr;
   }
+}
+
+body[data-card-size="medium"] .card {
+  padding: 8px 6px;
+  gap: 6px;
+}
+
+body[data-card-size="medium"] .card-thumb {
+  width: 34px;
+  height: 34px;
+  font-size: 0.74rem;
+}
+
+body[data-card-size="medium"] .card h3 {
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+body[data-card-size="small"] .card {
+  padding: 5px 4px;
+  gap: 3px;
+}
+
+body[data-card-size="small"] .card-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 0.64rem;
+}
+
+body[data-card-size="small"] .card h3 {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+body[data-card-size="small"] .drag-handle {
+  top: 3px;
+  right: 4px;
+  font-size: 0.68rem;
 }

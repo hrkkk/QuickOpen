@@ -56,7 +56,7 @@
       <section class="column" data-section="command">
         <div class="column-header">
           <div class="column-title">
-            <div class="icon-badge command-badge">&gt;_</div>
+            <div class="icon-badge command-badge">C</div>
             <h2>快捷指令</h2>
           </div>
           <div class="count">0 项</div>
@@ -103,8 +103,8 @@
         </div>
 
         <label class="field">
-          <span class="field-label">路径：</span>
-          <input id="pathInput" class="field-input field-input-disabled" type="text" readonly>
+          <span class="field-label" id="pathFieldLabel">路径：</span>
+          <input id="pathInput" class="field-input" type="text" required>
         </label>
 
         <div class="dialog-actions">
@@ -171,6 +171,18 @@
           <span class="field-label">名称</span>
           <input id="commandNameInput" class="field-input field-input-focus" type="text" placeholder="例如：启动本地服务" required>
         </label>
+
+        <div class="field">
+          <span class="field-label">图标（可选）</span>
+          <div class="icon-editor">
+            <div class="icon-preview" id="commandIconPreview">未选择</div>
+            <div class="icon-actions">
+              <input id="commandIconUrlInput" class="field-input" type="text" placeholder="粘贴 URL、Base64 或选择图片">
+              <button class="picker-btn" type="button" id="commandPickIconBtn">选择图片</button>
+              <input id="commandIconFileInput" type="file" accept="image/*" hidden>
+            </div>
+          </div>
+        </div>
 
         <label class="field">
           <span class="field-label">指令</span>

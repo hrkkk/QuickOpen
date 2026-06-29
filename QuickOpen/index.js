@@ -7,6 +7,7 @@ const displayNameInput = document.getElementById("displayNameInput");
 const launchNameInput = document.getElementById("launchNameInput");
 const iconUrlInput = document.getElementById("iconUrlInput");
 const pathInput = document.getElementById("pathInput");
+const pathFieldLabel = document.getElementById("pathFieldLabel");
 const iconPreview = document.getElementById("iconPreview");
 const iconFileInput = document.getElementById("iconFileInput");
 const pickIconBtn = document.getElementById("pickIconBtn");
@@ -23,6 +24,10 @@ const commandDialog = document.getElementById("commandDialog");
 const commandDialogTitle = document.getElementById("commandDialogTitle");
 const commandForm = document.getElementById("commandForm");
 const commandNameInput = document.getElementById("commandNameInput");
+const commandIconUrlInput = document.getElementById("commandIconUrlInput");
+const commandIconPreview = document.getElementById("commandIconPreview");
+const commandIconFileInput = document.getElementById("commandIconFileInput");
+const commandPickIconBtn = document.getElementById("commandPickIconBtn");
 const commandInput = document.getElementById("commandInput");
 const commandCwdInput = document.getElementById("commandCwdInput");
 const commandAdminInput = document.getElementById("commandAdminInput");
@@ -46,6 +51,10 @@ const DEFAULT_SETTINGS = Object.freeze({
 let activeCard = null;
 let toastTimer = null;
 let currentSettings = { ...DEFAULT_SETTINGS };
+let draggedCard = null;
+let dragSourceList = null;
+let dragOrderChanged = false;
+let iconLoadSequence = 0;
 
 function showToast(message) {
   toast.textContent = message;
@@ -184,7 +193,7 @@ function getBaseName(targetPath) {
 
 function getThumbLabel(type, targetPath) {
   if (type === "指令") {
-    return ">_";
+    return "C";
   }
   if (type === "网页") {
     return "WEB";
@@ -199,6 +208,81 @@ function getThumbLabel(type, targetPath) {
     return segments.pop().slice(0, 3).toUpperCase();
   }
   return "FILE";
+}
+
+function setCardThumbIcon(thumb, iconValue, fallbackLabel) {
+  const value = (iconValue || "").trim();
+  const loadToken = String(++iconLoadSequence);
+  thumb.dataset.iconLoadToken = loadToken;
+
+  const showFallback = () => {
+    if (thumb.dataset.iconLoadToken !== loadToken) {
+      return;
+    }
+    thumb.style.backgroundImage = "";
+    thumb.classList.remove("has-image");
+    thumb.textContent = fallbackLabel;
+  };
+
+  if (!value) {
+    showFallback();
+    return;
+  }
+
+  const image = new Image();
+  image.onload = () => {
+    if (thumb.dataset.iconLoadToken !== loadToken) {
+      return;
+    }
+    thumb.style.backgroundImage = `url("${value.replace(/"/g, '\\"')}")`;
+    thumb.classList.add("has-image");
+    thumb.textContent = "";
+  };
+  image.onerror = showFallback;
+  image.src = value;
+}
+
+function convertIconFileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("读取图片失败"));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("图片格式不受支持"));
+      image.onload = () => {
+        const maxSize = 128;
+        const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("无法处理图片"));
+          return;
+        }
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const optimized = canvas.toDataURL("image/webp", 0.82);
+        resolve(
+          optimized.startsWith("data:image/webp")
+            ? optimized
+            : canvas.toDataURL("image/png")
+        );
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function setIconFromFile(file, input, preview) {
+  try {
+    const dataUrl = await convertIconFileToDataUrl(file);
+    input.value = dataUrl;
+    setPreviewImage(preview, dataUrl);
+  } catch (error) {
+    showToast(error.message || "处理图片失败");
+  }
 }
 
 function normalizeWebUrl(value) {
@@ -287,6 +371,79 @@ function bindCardEvents(card) {
     event.preventDefault();
     openContextMenu(event, card);
   });
+
+  const dragHandle = card.querySelector(".drag-handle");
+  dragHandle.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  dragHandle.addEventListener("dragstart", (event) => {
+    draggedCard = card;
+    dragSourceList = card.closest(".card-list");
+    dragOrderChanged = false;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.title || "QuickOpen");
+    }
+    window.requestAnimationFrame(() => card.classList.add("dragging"));
+  });
+  dragHandle.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
+    dragSourceList?.classList.remove("drag-active");
+    if (dragOrderChanged) {
+      saveCards();
+      showToast("项目顺序已保存");
+    }
+    draggedCard = null;
+    dragSourceList = null;
+    dragOrderChanged = false;
+  });
+}
+
+function bindCardListSorting() {
+  document.querySelectorAll(".card-list").forEach((list) => {
+    list.addEventListener("dragover", (event) => {
+      if (!draggedCard || list !== dragSourceList) {
+        return;
+      }
+
+      event.preventDefault();
+      list.classList.add("drag-active");
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+
+      const targetCard = event.target.closest(".card");
+      if (!targetCard || targetCard === draggedCard) {
+        if (!targetCard && list.lastElementChild !== draggedCard) {
+          list.appendChild(draggedCard);
+          dragOrderChanged = true;
+        }
+        return;
+      }
+
+      const targetRect = targetCard.getBoundingClientRect();
+      const columnCount = getComputedStyle(list).gridTemplateColumns
+        .split(/\s+/)
+        .filter(Boolean).length;
+      const insertBefore = columnCount > 1
+        ? event.clientX < targetRect.left + targetRect.width / 2
+        : event.clientY < targetRect.top + targetRect.height / 2;
+
+      if (insertBefore) {
+        list.insertBefore(draggedCard, targetCard);
+      } else {
+        list.insertBefore(draggedCard, targetCard.nextElementSibling);
+      }
+      dragOrderChanged = true;
+    });
+
+    list.addEventListener("drop", (event) => {
+      if (draggedCard && list === dragSourceList) {
+        event.preventDefault();
+      }
+      list.classList.remove("drag-active");
+    });
+  });
 }
 
 function createCard(type, targetPath, options = {}) {
@@ -306,19 +463,20 @@ function createCard(type, targetPath, options = {}) {
   card.dataset.displayName = options.displayName || "";
   card.dataset.icon = options.icon || "";
   card.innerHTML = `
+    <span class="drag-handle" draggable="true" title="拖动排序" aria-label="拖动排序">⋮⋮</span>
     <div class="card-thumb">${thumbLabel}</div>
     <h3>${displayName}</h3>
   `;
 
   bindCardEvents(card);
-  if (options.defaultThumb) {
+  if (type === "指令") {
+    card.dataset.defaultThumb = "C";
+  } else if (options.defaultThumb) {
     card.dataset.defaultThumb = options.defaultThumb;
   }
   if (options.icon) {
     const thumb = card.querySelector(".card-thumb");
-    thumb.style.backgroundImage = `url("${options.icon.replace(/"/g, '\\"')}")`;
-    thumb.classList.add("has-image");
-    thumb.textContent = "";
+    setCardThumbIcon(thumb, options.icon, card.dataset.defaultThumb || thumbLabel);
   }
   return card;
 }
@@ -427,6 +585,8 @@ function openCommandDialog(card = null) {
   activeCard = card;
   commandDialogTitle.textContent = card ? "编辑快捷指令" : "添加快捷指令";
   commandNameInput.value = card ? (card.dataset.displayName || card.dataset.title || "") : "";
+  commandIconUrlInput.value = card ? (card.dataset.icon || "") : "";
+  setPreviewImage(commandIconPreview, commandIconUrlInput.value);
   commandInput.value = card ? (card.dataset.path || "") : "";
   commandCwdInput.value = card ? (card.dataset.cwd || "") : "";
   commandAdminInput.checked = card ? card.dataset.runAsAdmin === "true" : false;
@@ -440,6 +600,8 @@ function closeCommandDialog() {
   commandDialog.classList.remove("open");
   commandDialog.setAttribute("aria-hidden", "true");
   commandForm.reset();
+  commandIconFileInput.value = "";
+  setPreviewImage(commandIconPreview, "");
   activeCard = null;
 }
 
@@ -500,6 +662,10 @@ function openRenameDialog(card) {
   launchNameInput.value = title;
   iconUrlInput.value = icon;
   pathInput.value = path;
+  pathFieldLabel.textContent = card.dataset.type === "网页" ? "网址：" : "路径：";
+  pathInput.placeholder = card.dataset.type === "网页"
+    ? "例如：https://www.example.com"
+    : "输入文件或文件夹的完整路径";
   setPreviewImage(iconPreview, icon);
 
   renameDialog.classList.add("open");
@@ -615,18 +781,13 @@ pickIconBtn.addEventListener("click", () => {
   iconFileInput.click();
 });
 
-iconFileInput.addEventListener("change", () => {
+iconFileInput.addEventListener("change", async () => {
   const [file] = iconFileInput.files || [];
   if (!file) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    iconUrlInput.value = reader.result;
-    setPreviewImage(iconPreview, reader.result);
-  };
-  reader.readAsDataURL(file);
+  await setIconFromFile(file, iconUrlInput, iconPreview);
 });
 
 webIconUrlInput.addEventListener("input", () => {
@@ -637,18 +798,30 @@ webPickIconBtn.addEventListener("click", () => {
   webIconFileInput.click();
 });
 
-webIconFileInput.addEventListener("change", () => {
+webIconFileInput.addEventListener("change", async () => {
   const [file] = webIconFileInput.files || [];
   if (!file) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    webIconUrlInput.value = reader.result;
-    setPreviewImage(webIconPreview, reader.result);
-  };
-  reader.readAsDataURL(file);
+  await setIconFromFile(file, webIconUrlInput, webIconPreview);
+});
+
+commandIconUrlInput.addEventListener("input", () => {
+  setPreviewImage(commandIconPreview, commandIconUrlInput.value);
+});
+
+commandPickIconBtn.addEventListener("click", () => {
+  commandIconFileInput.click();
+});
+
+commandIconFileInput.addEventListener("change", async () => {
+  const [file] = commandIconFileInput.files || [];
+  if (!file) {
+    return;
+  }
+
+  await setIconFromFile(file, commandIconUrlInput, commandIconPreview);
 });
 
 renameForm.addEventListener("submit", (event) => {
@@ -662,29 +835,31 @@ renameForm.addEventListener("submit", (event) => {
   const launchName = launchNameInput.value.trim();
   const displayName = displayNameInput.value.trim();
   const iconValue = iconUrlInput.value.trim();
+  const type = activeCard.dataset.type;
+  const rawPath = pathInput.value.trim();
+  const targetPath = type === "网页" ? normalizeWebUrl(rawPath) : rawPath;
 
   if (!launchName) {
     launchNameInput.focus();
     return;
   }
 
+  if (!targetPath) {
+    pathInput.focus();
+    return;
+  }
+
   activeCard.dataset.title = launchName;
   activeCard.dataset.displayName = displayName;
   activeCard.dataset.icon = iconValue;
+  activeCard.dataset.path = targetPath;
+  activeCard.dataset.defaultThumb = getThumbLabel(type, targetPath);
 
   const titleNode = activeCard.querySelector("h3");
   titleNode.textContent = displayName || launchName;
 
   const thumb = activeCard.querySelector(".card-thumb");
-  if (iconValue) {
-    thumb.style.backgroundImage = `url("${iconValue.replace(/"/g, '\\"')}")`;
-    thumb.classList.add("has-image");
-    thumb.textContent = "";
-  } else {
-    thumb.style.backgroundImage = "";
-    thumb.classList.remove("has-image");
-    thumb.textContent = activeCard.dataset.defaultThumb || "DIR";
-  }
+  setCardThumbIcon(thumb, iconValue, activeCard.dataset.defaultThumb || "DIR");
 
   closeRenameDialog();
   saveCards();
@@ -722,6 +897,7 @@ commandForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const name = commandNameInput.value.trim();
+  const iconValue = commandIconUrlInput.value.trim();
   const command = commandInput.value.trim();
   const cwd = commandCwdInput.value.trim();
   const runAsAdmin = commandAdminInput.checked;
@@ -738,16 +914,20 @@ commandForm.addEventListener("submit", (event) => {
   if (activeCard && activeCard.dataset.type === "指令") {
     activeCard.dataset.title = name;
     activeCard.dataset.displayName = name;
+    activeCard.dataset.icon = iconValue;
     activeCard.dataset.path = command;
     activeCard.dataset.cwd = cwd;
     activeCard.dataset.runAsAdmin = runAsAdmin ? "true" : "false";
     activeCard.querySelector("h3").textContent = name;
+    const thumb = activeCard.querySelector(".card-thumb");
+    setCardThumbIcon(thumb, iconValue, activeCard.dataset.defaultThumb || "C");
     saveCards();
     showToast(`已更新：${name}`);
   } else {
     addCardToSection("command", "指令", command, {
       title: name,
       displayName: name,
+      icon: iconValue,
       cwd,
       runAsAdmin
     });
@@ -833,4 +1013,5 @@ window.addEventListener("scroll", hideContextMenu, true);
 window.addEventListener("blur", hideContextMenu);
 
 loadSettings();
+bindCardListSorting();
 loadCards();
