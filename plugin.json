@@ -1,0 +1,13 @@
+{
+  "logo": "logo.png",
+  "main": "index.html",
+  "features": [
+    {
+      "code": "test",
+      "cmds": [
+        "QuickOpen"
+      ],
+      "explain": "快速打开文件、文件夹或网页"
+    }
+  ]
+}
