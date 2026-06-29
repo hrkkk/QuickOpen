@@ -1,13 +1,14 @@
 {
   "logo": "logo.png",
   "main": "index.html",
+  "preload": "preload.js",
   "features": [
     {
       "code": "test",
       "cmds": [
         "QuickOpen"
       ],
-      "explain": "快速打开文件、文件夹或网页"
+      "explain": "快速打开文件、文件夹、网页或执行快捷指令"
     }
   ]
 }

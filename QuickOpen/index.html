@@ -6,7 +6,7 @@
   <title>QuickOpen 面板</title>
   <link rel="stylesheet" href="./index.css">
 </head>
-<body>
+<body data-column-layout="grid" data-card-size="medium">
   <div class="app">
     <section class="topbar">
       <h1>QuickOpen</h1>
@@ -14,6 +14,8 @@
         <button class="action-btn" type="button" data-add-target="file">添加文件</button>
         <button class="action-btn" type="button" data-add-target="folder">添加文件夹</button>
         <button class="action-btn" type="button" data-add-target="web">添加网页</button>
+        <button class="action-btn action-btn-command" type="button" data-add-target="command">添加指令</button>
+        <button class="settings-btn" id="openSettingsBtn" type="button" aria-label="设置" title="设置">⚙</button>
       </div>
     </section>
 
@@ -50,11 +52,22 @@
         </div>
         <div class="card-list"></div>
       </section>
+
+      <section class="column" data-section="command">
+        <div class="column-header">
+          <div class="column-title">
+            <div class="icon-badge command-badge">&gt;_</div>
+            <h2>快捷指令</h2>
+          </div>
+          <div class="count">0 项</div>
+        </div>
+        <div class="card-list"></div>
+      </section>
     </main>
   </div>
 
   <div class="context-menu" id="contextMenu">
-    <button class="menu-item" type="button" data-action="rename">重命名</button>
+    <button class="menu-item" type="button" data-action="rename">编辑</button>
     <button class="menu-item" type="button" data-action="copy">复制路径</button>
     <button class="menu-item delete" type="button" data-action="delete">删除</button>
   </div>
@@ -140,6 +153,101 @@
         <div class="dialog-actions">
           <button class="dialog-btn dialog-btn-secondary" type="button" data-close-web-dialog="true">取消</button>
           <button class="dialog-btn dialog-btn-primary" type="submit">确定</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="dialog-shell" id="commandDialog" aria-hidden="true">
+    <div class="dialog-backdrop" data-close-command-dialog="true"></div>
+    <section class="rename-dialog command-dialog" role="dialog" aria-modal="true" aria-labelledby="commandDialogTitle">
+      <div class="dialog-head">
+        <h2 id="commandDialogTitle">添加快捷指令</h2>
+        <p>保存后，点击卡片即可在后台执行。</p>
+      </div>
+
+      <form class="rename-form" id="commandForm">
+        <label class="field">
+          <span class="field-label">名称</span>
+          <input id="commandNameInput" class="field-input field-input-focus" type="text" placeholder="例如：启动本地服务" required>
+        </label>
+
+        <label class="field">
+          <span class="field-label">指令</span>
+          <textarea id="commandInput" class="field-input field-textarea" placeholder="例如：npm run dev" required spellcheck="false"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="field-label">工作目录（可选）</span>
+          <div class="path-picker-row">
+            <input id="commandCwdInput" class="field-input" type="text" placeholder="留空则使用插件目录">
+            <button class="picker-btn" type="button" id="pickCommandCwdBtn">选择目录</button>
+          </div>
+        </label>
+
+        <label class="toggle-field" for="commandAdminInput">
+          <span class="toggle-copy">
+            <strong>以管理员身份执行</strong>
+            <small>执行时将弹出 Windows 用户账户控制确认。</small>
+          </span>
+          <input id="commandAdminInput" type="checkbox">
+          <span class="toggle-control" aria-hidden="true"></span>
+        </label>
+
+        <div class="command-tip">指令将使用系统默认 Shell 执行，请只保存你信任的内容。</div>
+
+        <div class="dialog-actions">
+          <button class="dialog-btn dialog-btn-secondary" type="button" data-close-command-dialog="true">取消</button>
+          <button class="dialog-btn dialog-btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="dialog-shell" id="settingsDialog" aria-hidden="true">
+    <div class="dialog-backdrop" data-close-settings-dialog="true"></div>
+    <section class="rename-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsDialogTitle">
+      <div class="dialog-head settings-head">
+        <h2 id="settingsDialogTitle">界面设置</h2>
+        <p>调整主界面栏目布局和项目方块大小。</p>
+      </div>
+
+      <form class="settings-form" id="settingsForm">
+        <fieldset class="settings-group">
+          <legend>栏目显示方式</legend>
+          <div class="settings-options settings-options-layout">
+            <label class="setting-choice">
+              <input type="radio" name="columnLayout" value="vertical">
+              <span><strong>垂直显示</strong><small>四个栏目从上到下排列</small></span>
+            </label>
+            <label class="setting-choice">
+              <input type="radio" name="columnLayout" value="grid">
+              <span><strong>网格显示</strong><small>四个栏目以 2 × 2 排列</small></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group">
+          <legend>项目方块大小</legend>
+          <div class="settings-options settings-options-size">
+            <label class="setting-choice size-choice">
+              <input type="radio" name="cardSize" value="small">
+              <span><i class="size-preview size-preview-small"></i><strong>小</strong></span>
+            </label>
+            <label class="setting-choice size-choice">
+              <input type="radio" name="cardSize" value="medium">
+              <span><i class="size-preview size-preview-medium"></i><strong>中</strong></span>
+            </label>
+            <label class="setting-choice size-choice">
+              <input type="radio" name="cardSize" value="large">
+              <span><i class="size-preview size-preview-large"></i><strong>大</strong></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="dialog-actions settings-actions">
+          <button class="dialog-btn dialog-btn-secondary" type="button" data-close-settings-dialog="true">取消</button>
+          <button class="dialog-btn dialog-btn-primary" type="submit">保存设置</button>
         </div>
       </form>
     </section>
